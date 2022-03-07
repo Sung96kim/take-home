@@ -18,3 +18,7 @@ class PostInvoice(BaseModel):
 class GetInvoices(BaseModel):
     id: integer
     vendor: str
+
+
+class GetSingleInvoice(PostInvoice):
+    pass

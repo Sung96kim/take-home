@@ -11,7 +11,7 @@ from indico.queries import (
 
 from .database import get_db, engine
 from .db import models, Invoice
-from schemas import PostInvoice, GetInvoices
+from schemas import GetSingleInvoice, PostInvoice, GetInvoices
 
 my_config = IndicoConfig(host="app.indico.io", api_token_path="./indico_api_token.txt")
 client = IndicoClient(config=my_config)
@@ -45,10 +45,18 @@ Get specific invoice by vendor name
 """
 
 
-@app.get("/{vendor_name}")
+@app.get("/{vendor_name}", response_model=GetSingleInvoice)
 async def get_vendor_invoice(vendor_name: str, db: Session = Depends(get_db)):
 
-    return {"message": "Vendor Invoice", "vendor": vendor_name}
+    single_invoice = db.query(Invoice).filter(Invoice.vendor == vendor_name).first()
+
+    if not single_invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Vendor name does not exist in database",
+        )
+
+    return single_invoice
 
 
 """
