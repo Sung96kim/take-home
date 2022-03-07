@@ -13,6 +13,7 @@ class PostInvoice(BaseModel):
     invoiceDate: str
     invoiceDue: str
     invoiceAmountDue: str
+    created_at: datetime
 
 
 class GetInvoices(BaseModel):

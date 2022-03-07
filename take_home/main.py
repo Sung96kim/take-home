@@ -1,3 +1,4 @@
+from email.policy import HTTP
 from typing import List
 from fastapi import Depends, FastAPI, HTTPException, status
 from sqlalchemy.orm import Session
@@ -27,7 +28,7 @@ Get all invoice ids with vendor names
 """
 
 
-@app.get("/", response_model=List[GetInvoices])
+@app.get("/invoices", response_model=List[GetInvoices])
 async def root(db: Session = Depends(get_db)):
 
     all_invoices = db.query(Invoice).all()
@@ -45,18 +46,18 @@ Get specific invoice by vendor name
 """
 
 
-@app.get("/{vendor_name}", response_model=GetSingleInvoice)
-async def get_vendor_invoice(vendor_name: str, db: Session = Depends(get_db)):
+@app.get("/invoices/{vendor_name}", response_model=List[GetSingleInvoice])
+async def get_vendor_invoices(vendor_name: str, db: Session = Depends(get_db)):
 
-    single_invoice = db.query(Invoice).filter(Invoice.vendor == vendor_name).first()
+    vendor_invoices = db.query(Invoice).filter(Invoice.vendor == vendor_name).all()
 
-    if not single_invoice:
+    if not vendor_invoices:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Vendor name does not exist in database",
         )
 
-    return single_invoice
+    return vendor_invoices
 
 
 """
@@ -64,9 +65,18 @@ Get invoice data by unique identifier
 """
 
 
-@app.get("/invoices/{submissionID}")
+@app.get("/invoice/{submissionID}", response_model=GetSingleInvoice)
 async def get_invoice(submissionID: int, db: Session = Depends(get_db)):
-    return {"message": "Vendor Invoice With Information", "submissionID": submissionID}
+
+    invoice = db.query(Invoice).filter(Invoice.id == submissionID).first()
+
+    if not invoice:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Invoice by that ID does not exist",
+        )
+
+    return invoice
 
 
 """
@@ -85,8 +95,10 @@ async def post_invoice(post: PostInvoice, db: Session = Depends(get_db)):
     submission_id = submission_ids[0]
 
     result_url = client.call(SubmissionResult(submission_id, wait=True))
-    result = client.call(RetrieveStorageObject(result_url.result))
+    result = client.call(RetrieveStorageObject(result_url.result))["results"][
+        "document"
+    ]["results"]["Invoice Fields q2026 model"]["final"]
 
     client.call(UpdateSubmission(submission_id, retrieved=True))
 
-    return result
+    return

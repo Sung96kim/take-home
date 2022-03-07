@@ -23,7 +23,7 @@ submission_id = submission_ids[0]
 result_url = client.call(SubmissionResult(submission_id, wait=True))
 result = client.call(RetrieveStorageObject(result_url.result))
 
-print(result["results"]["document"]["Invoice Fields q2026 model"]["final"])
+print(result["results"]["document"]["results"]["Invoice Fields q2026 model"]["final"])
 
 # Get 'final'
 
