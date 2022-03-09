@@ -1,32 +1,18 @@
-from indico import IndicoClient, IndicoConfig
-from indico.queries import (
-    RetrieveStorageObject,
-    SubmissionResult,
-    UpdateSubmission,
-    WorkflowSubmission,
-)
-import ipdb
+import requests
+import glob
 
-# Create an Indico API client
-my_config = IndicoConfig(host="app.indico.io", api_token_path="./indico_api_token.txt")
-client = IndicoClient(config=my_config)
+# import ipdb
 
-workflow_id = 933
+url = "http://127.0.0.1:8000/invoices/uploadfiles"
+# paths = glob.glob("/home/sung96kim/take-home/assets/*", recursive=True)
+# # print(paths)
+# files = [("files", open(path, "rb")) for path in paths]
+files = [
+    ("files", open("/home/sung96kim/take-home/assets/AriatInvoice03.28.19.pdf", "rb"))
+]
+print(files)
+resp = requests.post(url=url, files=files)
+print(resp.json())
+print("Reached the end")
 
-submission_ids = client.call(
-    WorkflowSubmission(
-        workflow_id=workflow_id, files=["./assets/AriatInvoice03.28.19.pdf"]
-    )
-)
-submission_id = submission_ids[0]
-
-result_url = client.call(SubmissionResult(submission_id, wait=True))
-result = client.call(RetrieveStorageObject(result_url.result))
-
-print(result["results"]["document"]["results"]["Invoice Fields q2026 model"]["final"])
-
-# Get 'final'
-
-client.call(UpdateSubmission(submission_id, retrieved=True))
-
-ipdb.set_trace()
+# ipdb.set_trace()

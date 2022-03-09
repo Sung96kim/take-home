@@ -1,5 +1,4 @@
 from datetime import datetime
-from numpy import integer
 from pydantic import BaseModel
 
 
@@ -8,8 +7,8 @@ class PostInvoice(BaseModel):
     street: str
     city: str
     state: str
-    zip: str
-    invoiceNum: str
+    zip: int
+    invoiceNum: int
     invoiceDate: str
     invoiceDue: str
     invoiceAmountDue: str
@@ -17,9 +16,9 @@ class PostInvoice(BaseModel):
 
 
 class GetInvoices(BaseModel):
-    id: integer
+    id: int
     vendor: str
 
 
 class GetSingleInvoice(PostInvoice):
-    pass
+    id: int
