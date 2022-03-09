@@ -1,6 +1,8 @@
-import shutil
+import aiofiles
+import os
 from typing import List
-from fastapi import Depends, FastAPI, HTTPException, status, File, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, status, UploadFile
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from indico import IndicoClient, IndicoConfig
 from indico.queries import (
@@ -12,16 +14,32 @@ from indico.queries import (
 
 from .database import get_db, engine
 from .db import models, Invoice
+
 from .schemas import GetSingleInvoice, PostInvoice, GetInvoices
 
 my_config = IndicoConfig(host="app.indico.io", api_token_path="./indico_api_token.txt")
 client = IndicoClient(config=my_config)
 
 workflow_id = 933
+directory = "/home/sung96kim/take-home/temp_folder"
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+
+@app.get("/")
+async def main():
+    content = """
+        <body>
+            <form action="/invoices/uploadfiles" enctype="multipart/form-data" method="post">
+            <input name="files" type="file" multiple>
+            <input type="submit">
+            </form>
+        </body>
+    """
+    return HTMLResponse(content=content)
+
 
 """
 Get all invoice ids with vendor names
@@ -86,100 +104,75 @@ Post invoice
 
 @app.post("/invoices/uploadfiles", status_code=status.HTTP_201_CREATED)
 async def post_invoice(
-    # files: List[UploadFile] = File(...),
-    # template: PostInvoice,
+    files: List[UploadFile],
     db: Session = Depends(get_db),
 ):
-    # copiedFiles = []
-    # for file in files:
-    #     with open(file.filename, "r+b") as buffer:
-    #         copiedFiles.append(await buffer.read())
+    try:
+        fileList = []
 
-    # submission_ids = client.call(
-    #     WorkflowSubmission(
-    #         workflow_id=workflow_id,
-    #         files=copiedFiles,
-    #     )
-    # )
-    # submission_id = submission_ids[0]
+        for file in files:
+            async with aiofiles.open(f"{directory}/{file.filename}", "wb") as tmp:
+                while True:
+                    content = await file.read(1024)
+                    if not content:
+                        break
+                    await tmp.write(content)
+            fileList.append(tmp.name)
 
-    # result_url = client.call(SubmissionResult(submission_id, wait=True))
-    # result = client.call(RetrieveStorageObject(result_url.result))
-
-    # client.call(UpdateSubmission(submission_id, retrieved=True))
-
-    # return result
-
-    # finally:
-    #     return {"Uploaded Files" : [file.filename for file in files]}
-
-    # try:
-    submission_ids = client.call(
-        WorkflowSubmission(
-            workflow_id=workflow_id,
-            files=[
-                "./assets/AriatInvoice03.28.19.pdf",
-                # "./assets/ERS Invoice 03.19.19 (3)_2.pdf",
-                # "./assets/ERS Invoice 06.05.18 .pdf",
-                # "./assets/ERS Invoice 12.26.19 .pdf",
-                # "./assets/ERSInvoice01.02.18_2.pdf",
-                "./assets/Kerrits Invoice 10.15.19.pdf",
-                # "./assets/Kerrits Invoice 10.22.19 (2).pdf",
-                "./assets/RJ Matthews Invoice 01.21.19 (1).pdf",
-                "./assets/RJ Matthews Invoice 01.28.19 .pdf",
-                "./assets/RJ Matthews Order 01.21.19 (2).pdf",
-                "./assets/RJ Matthews Order 01.23.19 .pdf",
-                "./assets/RJ Matthews Order 02.11.19 .pdf",
-                "./assets/RJ Matthews Order 03.11.19 .pdf",
-                "./assets/RJ Matthews Order 03.27.19 .pdf",
-                "./assets/RJ Matthews Order 05.06.19.pdf",
-            ],
+        submission_ids = client.call(
+            WorkflowSubmission(
+                workflow_id=workflow_id,
+                files=fileList,
+            )
         )
-    )
 
-    submissionID = submission_ids[0]
-    submissionList = list()
+        submissionList = []
 
-    for submission_id in submission_ids:
-        result_url = client.call(SubmissionResult(submission_id, wait=True))
-        result = client.call(RetrieveStorageObject(result_url.result))["results"][
-            "document"
-        ]["results"]["Invoice Fields q2026 model"]["final"]
+        for submission_id in submission_ids:
+            result_url = client.call(SubmissionResult(submission_id, wait=True))
+            result = client.call(RetrieveStorageObject(result_url.result))["results"][
+                "document"
+            ]["results"]["Invoice Fields q2026 model"]["final"]
 
-        submissionObj = {}
-        for cols in result:
-            submissionObj[cols["label"]] = cols["text"]
-            if submissionObj[cols["label"]] == "Invoice #":
-                submissionObj[cols["label"]] == "".join(
-                    filter(str.isdigit), cols["text"]
-                )
+            submissionObj = {}
+            for cols in result:
+                submissionObj[cols["label"]] = cols["text"]
+                if submissionObj[cols["label"]] == "Invoice #":
+                    submissionObj[cols["label"]] == "".join(
+                        filter(str.isdigit), cols["text"]
+                    )
 
-        template: PostInvoice = {
-            "vendor": submissionObj.get("Vendor Name"),
-            "street": submissionObj.get("Vendor Street"),
-            "city": submissionObj.get("Vendor City"),
-            "state": submissionObj.get("Vendor State"),
-            "zip": submissionObj.get("Vendor Zip"),
-            "invoiceNum": submissionObj.get("Invoice #"),
-            "invoiceDate": submissionObj.get("Invoice Date"),
-            "invoiceDue": submissionObj.get("Due Date"),
-            "invoiceAmountDue": submissionObj.get("Amount Due"),
-        }
+            template: PostInvoice = {
+                "vendor": submissionObj.get("Vendor Name"),
+                "street": submissionObj.get("Vendor Street"),
+                "city": submissionObj.get("Vendor City"),
+                "state": submissionObj.get("Vendor State"),
+                "zip": submissionObj.get("Vendor Zip"),
+                "invoiceNum": submissionObj.get("Invoice #"),
+                "invoiceDate": submissionObj.get("Invoice Date"),
+                "invoiceDue": submissionObj.get("Due Date"),
+                "invoiceAmountDue": submissionObj.get("Amount Due"),
+            }
 
-        submissionList.append(template)
-        client.call(UpdateSubmission(submissionID, retrieved=True))
+            submissionList.append(template)
+            client.call(UpdateSubmission(submission_id, retrieved=True))
 
-    for submission in submissionList:
-        invoice = Invoice(**submission)
-        db.add(invoice)
-        db.commit()
-        db.refresh(invoice)
+        # For each submission, add into database
+        for submission in submissionList:
+            invoice = Invoice(**submission)
+            db.add(invoice)
+            db.commit()
+            db.refresh(invoice)
 
-    return submissionList
+        # Remove created temp files after checking if they exist
+        for tempFile in fileList:
+            if os.path.exists(tempFile):
+                os.remove(tempFile)
 
+        return submissionList
 
-# except:
-#     raise HTTPException(
-#         status_code=status.HTTP_400_BAD_REQUEST,
-#         detail=f"There was a problem with adding the invoice(s) to the database",
-#     )
+    except:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"There was a problem with adding the invoice(s) to the database",
+        )
