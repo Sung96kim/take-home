@@ -1,3 +1,3 @@
-Technology: Fastapi, SQLAlchemy 
+Technology: Python, Fastapi, SQLAlchemy 
 
-Backend created to retreive invoices
+Backend created to upload files and retrieve uploaded invoices
